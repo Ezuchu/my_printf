@@ -1,9 +1,14 @@
 #include <stdarg.h>
+#include <stdint.h>
 #include <stdlib.h>
-#include <stdio.h>
 #include <stdbool.h>
+#include <windows.h>
 
 #define BUFFER_SIZE 2048
+
+
+
+
 
 
 typedef unsigned char byte;
@@ -14,6 +19,8 @@ typedef struct {
     bool space;
     bool hex_prefix;
     bool zero_pad;
+
+    bool sign_number;
 
     char specifier;
 
@@ -47,7 +54,7 @@ void init_memory(void *ptr,int value, size_t size){
 }
 
 void init_flags(format_flags *flags_data){
-    *flags_data = (format_flags){false,false,false,false,false,(char)0,1,-1};
+    *flags_data = (format_flags){false,false,false,false,false,false,(char)0,1,-1};
 }
 
 int init_string_data(string_data *data, const char* format){
@@ -121,7 +128,9 @@ int parse_format(string_data *data){
 
 void write_to_buffer(string_data *data, char c){
     if(data->buffer_index == BUFFER_SIZE){//If overflow, Flush the buffer
-        fputs(data->buffer,stdout);
+        HANDLE hStdout = GetStdHandle(STD_OUTPUT_HANDLE);
+        DWORD bytesWritten;
+        WriteFile(hStdout,data->buffer,data->buffer_index+1,&bytesWritten,NULL);
         data->buffer_index = 0;
         init_memory(data->buffer,0,sizeof(char)*BUFFER_SIZE);
     }
@@ -208,6 +217,21 @@ void handle_string(string_data *data, char* value){
     }
 }
 
+char *int_to_string(long int number, bool is_unsigned, int *lenght){
+    long int absolute = number;
+    bool negative = false;
+    if(absolute < 0){
+        absolute*=-1;
+        negative = true;
+    }
+}
+
+void handle_int(string_data *data, long int value, int base){
+    int width = data->flags.width;
+
+
+}
+
     
 
 void handle_format(string_data *data){
@@ -220,6 +244,18 @@ void handle_format(string_data *data){
         case 's':
             handle_string(data,va_arg(data->arguments,char *));
             break;
+
+        case 'i':
+        case 'd':
+        case 'u':
+        case 'o':
+        case 'x':
+        case 'X':
+        case 'p':
+            if(specifier == 'i' || specifier == 'd'){
+                handle_int(data,(long int)va_arg(data->arguments,int),10);break;
+            }
+            
         default:
     }
 }
@@ -243,7 +279,9 @@ int my_printf(const char* format, ...){
         }
         data.string++;
     }
-    puts(data.buffer);
+    HANDLE hStdout = GetStdHandle(STD_OUTPUT_HANDLE);
+    DWORD bytesWritten;
+    WriteFile(hStdout,data.buffer,data.buffer_index+1,&bytesWritten,NULL);
 
     va_end(data.arguments);
 
@@ -253,8 +291,10 @@ int my_printf(const char* format, ...){
 int main(){
     //my_printf("hola %c%-10c%c%c%c",'m','u','n','d','o');
 
-    my_printf("%.5s","hola mundo");
+    my_printf("%s","hola mundo");
 
+
+    
 
     return 0;
 }
