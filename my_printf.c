@@ -131,9 +131,7 @@ void write_to_buffer(string_data *data, char c){
 
 //handles %c, - flag and width
 void handle_char(string_data *data, char value){
-
     int width = data->flags.width; 
-    
 
     if(width > 1){
         int cont = width-1;
@@ -153,8 +151,61 @@ void handle_char(string_data *data, char value){
 
     }else{
         write_to_buffer(data,value);
+    } 
+}
+
+int string_length(char *string){
+    int cont = 0;
+    if(string == NULL) return 0;
+
+    while(*string){
+        cont++;
+        string++;
+    }
+    return cont;
+}
+
+void write_string_to_buffer(string_data * data,char* string,int length){
+    if(0 > length) return;
+
+    while(length != 0){
+        write_to_buffer(data,*string);
+        string++;
+        length--;
+    }
+}
+
+//handles %s, - flag, width and precision
+void handle_string(string_data *data, char* value){
+    int width = data->flags.width; 
+    int precision = data->flags.precision;
+    int length = string_length(value);
+
+    //characters to print
+    if(length > precision && precision > 0){
+        length = precision;
     }
     
+    if(width > length){
+        int cont = width - length;
+        if(data->flags.left_justified){
+            write_string_to_buffer(data,value,length);
+            while (cont != 0)
+            {
+                write_to_buffer(data,' ');
+                cont--;
+            }
+        }else{
+            while (cont != 0)
+            {
+                write_to_buffer(data,' ');
+                cont--;
+            }
+            write_string_to_buffer(data,value,length);
+        }
+    }else{
+        write_string_to_buffer(data,value,length);
+    }
 }
 
     
@@ -164,8 +215,10 @@ void handle_format(string_data *data){
 
     switch(specifier){
         case 'c':
-            char value = (char)va_arg(data->arguments,int);
-            handle_char(data,value);
+            handle_char(data,(char)va_arg(data->arguments,int));
+            break;
+        case 's':
+            handle_string(data,va_arg(data->arguments,char *));
             break;
         default:
     }
@@ -198,7 +251,10 @@ int my_printf(const char* format, ...){
 }
 
 int main(){
-    my_printf("hola %c%-10c%c%c%c",'m','u','n','d','o');
+    //my_printf("hola %c%-10c%c%c%c",'m','u','n','d','o');
+
+    my_printf("%.5s","hola mundo");
+
 
     return 0;
 }
