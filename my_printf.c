@@ -1,7 +1,7 @@
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdlib.h>
-//#include <stdio.h>
+#include <stdio.h>
 #include <stdbool.h>
 #include <windows.h>
 
@@ -226,6 +226,7 @@ void handle_string(string_data *data, char* value){
 }
 
 void *int_to_string(long int number, string_data *data, int *chars_written, int base,char* string){
+    char digits[16] = "0123456789ABCDEF";
     bool negative = false;
     char temp[66];
     int index = 0;
@@ -250,7 +251,7 @@ void *int_to_string(long int number, string_data *data, int *chars_written, int 
         length++;
     }else{
         while(number != 0){
-            temp[t_index++] = DIV_MOD(number,base) + '0';
+            temp[t_index++] = digits[DIV_MOD(number,base)];
             length++;
         }
     }
@@ -312,10 +313,17 @@ void handle_format(string_data *data){
         case 'u':
                 data->flags.unsign_number = true;
                 handle_int(data,(long int)va_arg(data->arguments,int),10);break;
-        case 'o':
+
+        case 'o':data->flags.unsign_number = true;
+                handle_int(data,(long int)va_arg(data->arguments,int),8);break;
+
         case 'x':
-        case 'X':
+        case 'X':data->flags.unsign_number = true;
+                handle_int(data,(long int)va_arg(data->arguments,int),16);break;
+
         case 'p':
+            data->flags.unsign_number = true;
+            handle_int(data,(long int)va_arg(data->arguments,void *),16);break;
 
             
         default:
@@ -355,8 +363,8 @@ int main(){
 
     my_printf("%s\n","hola mundo");
 
-    my_printf("%05.1u\n",-1);
-
+    my_printf("%X\n",-25);
+    printf("%X\n",-25);
     
 
     return 0;
