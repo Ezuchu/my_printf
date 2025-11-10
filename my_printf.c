@@ -1,6 +1,7 @@
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdlib.h>
+//#include <stdio.h>
 #include <stdbool.h>
 #include <windows.h>
 
@@ -8,6 +9,13 @@
 
 
 
+//macro from linux implementation
+#define DIV_MOD(n,base) ({\
+    int res;\
+    res = ((unsigned long)n) % (unsigned) base;\
+    n = ((unsigned long)n) / (unsigned) base;\
+    res;\
+})
 
 
 
@@ -20,7 +28,7 @@ typedef struct {
     bool hex_prefix;
     bool zero_pad;
 
-    bool sign_number;
+    bool unsign_number;
 
     char specifier;
 
@@ -217,19 +225,71 @@ void handle_string(string_data *data, char* value){
     }
 }
 
-char *int_to_string(long int number, bool is_unsigned, int *lenght){
-    long int absolute = number;
+void *int_to_string(long int number, string_data *data, int *chars_written, int base,char* string){
     bool negative = false;
-    if(absolute < 0){
-        absolute*=-1;
+    char temp[66];
+    int index = 0;
+    int t_index = 0;
+    int length = 0;
+    if(!data->flags.unsign_number && number < 0){//%i %d 
+        number*=-1;
         negative = true;
     }
+    unsigned long int u_number= (unsigned long int)number;
+
+    if(negative){
+        string[index++] = '-';
+    }else if(data->flags.sign){
+        string[index++] = '+';
+    }else if(data->flags.space){
+        string[index++] = ' ';
+    }
+
+    if(number == 0){
+        temp[t_index++] = '0';
+        length++;
+    }else{
+        while(number != 0){
+            temp[t_index++] = DIV_MOD(number,base) + '0';
+            length++;
+        }
+    }
+
+    while(length < data->flags.precision){
+        string[index++] = '0';
+    }
+    while(t_index-- > 0){
+        string[index++] = temp[t_index];
+    } 
+    *chars_written = index;
 }
 
 void handle_int(string_data *data, long int value, int base){
     int width = data->flags.width;
 
+    int length = 0;
+    char string[64];
+    int_to_string(value,data,&length,base,string);
 
+    if(width > length){
+        int cont = width - length;
+        if(data->flags.left_justified){
+            write_string_to_buffer(data,string,length);
+            while(cont != 0){
+                write_to_buffer(data,' ');
+                cont--;
+            }
+        }else{
+            char pad = data->flags.zero_pad && data->flags.precision < 1? '0' : ' ';
+            while(cont != 0){
+                write_to_buffer(data,pad);
+                cont--;
+            }
+            write_string_to_buffer(data,string,length);
+        }
+    }else{
+        write_string_to_buffer(data,string,length);
+    }
 }
 
     
@@ -247,14 +307,16 @@ void handle_format(string_data *data){
 
         case 'i':
         case 'd':
+                handle_int(data,(long int)va_arg(data->arguments,int),10);break;
+
         case 'u':
+                data->flags.unsign_number = true;
+                handle_int(data,(long int)va_arg(data->arguments,int),10);break;
         case 'o':
         case 'x':
         case 'X':
         case 'p':
-            if(specifier == 'i' || specifier == 'd'){
-                handle_int(data,(long int)va_arg(data->arguments,int),10);break;
-            }
+
             
         default:
     }
@@ -289,10 +351,11 @@ int my_printf(const char* format, ...){
 }
 
 int main(){
-    //my_printf("hola %c%-10c%c%c%c",'m','u','n','d','o');
+    my_printf("hola %c%-10c%c%c%c\n",'m','u','n','d','o');
 
-    my_printf("%s","hola mundo");
+    my_printf("%s\n","hola mundo");
 
+    my_printf("%05.1u\n",-1);
 
     
 
