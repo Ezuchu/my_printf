@@ -1,7 +1,7 @@
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <stdio.h>
+//#include <stdio.h>
 #include <stdbool.h>
 #include <windows.h>
 
@@ -30,6 +30,7 @@ typedef struct {
 
     bool unsign_number;
 
+    char length;
     char specifier;
 
     int width;
@@ -49,6 +50,15 @@ typedef struct{
     format_flags flags;
 }string_data;
 
+long power(long base, int exp){
+    long result = base;
+    while(exp != 1){
+        result*=base;
+        exp--;
+    }
+    return result;
+}
+
 void init_memory(void *ptr,int value, size_t size){
     byte *byte_ptr;
 
@@ -62,7 +72,7 @@ void init_memory(void *ptr,int value, size_t size){
 }
 
 void init_flags(format_flags *flags_data){
-    *flags_data = (format_flags){false,false,false,false,false,false,(char)0,1,-1};
+    *flags_data = (format_flags){false,false,false,false,false,false,(char)0,(char)0,1,-1};
 }
 
 int init_string_data(string_data *data, const char* format){
@@ -127,6 +137,10 @@ int parse_format(string_data *data){
     if(*data->string == '.'){
         data->string++;
         parse_precision(data);
+    }
+
+    if(*data->string == 'l' || *data->string == 'h' || *data->string == 'L'){
+
     }
 
     data->flags.specifier = *data->string;
@@ -229,7 +243,7 @@ void *int_to_string(long int number, string_data *data, int *chars_written, int 
     char digits[16] = "0123456789ABCDEF";
     bool negative = false;
     char temp[66];
-    int index = 0;
+    int index = *chars_written;
     int t_index = 0;
     int length = 0;
     if(!data->flags.unsign_number && number < 0){//%i %d 
@@ -238,13 +252,17 @@ void *int_to_string(long int number, string_data *data, int *chars_written, int 
     }
     unsigned long int u_number= (unsigned long int)number;
 
-    if(negative){
-        string[index++] = '-';
-    }else if(data->flags.sign){
-        string[index++] = '+';
-    }else if(data->flags.space){
-        string[index++] = ' ';
+    //Handle -+' ' flags
+    if(base == 10){
+        if(negative){
+            string[index++] = '-';
+        }else if(data->flags.sign){
+            string[index++] = '+';
+        }else if(data->flags.space){
+            string[index++] = ' ';
+        }
     }
+    
 
     if(number == 0){
         temp[t_index++] = '0';
@@ -256,14 +274,23 @@ void *int_to_string(long int number, string_data *data, int *chars_written, int 
         }
     }
 
+    if(data->flags.hex_prefix && base != 10){
+        string[index++] = '0';
+        if(base == 16){
+            string[index++] = 'X';
+        }
+    }
+
     while(length < data->flags.precision){
         string[index++] = '0';
+        length++;
     }
     while(t_index-- > 0){
         string[index++] = temp[t_index];
     } 
     *chars_written = index;
 }
+
 
 void handle_int(string_data *data, long int value, int base){
     int width = data->flags.width;
@@ -293,6 +320,48 @@ void handle_int(string_data *data, long int value, int base){
     }
 }
 
+
+
+void handle_real(string_data *data, double number, int base){
+    int precision = data->flags.precision > 0? data->flags.precision : 6;//digits count
+    data->flags.precision = 0;
+    int width = data->flags.width;
+    int length = 0;
+    char string[128];
+
+    long i_number = (long) number;//obtain int number
+    double f_number = number - i_number;
+    int_to_string(i_number,data,&length,base,string);
+    
+    if(f_number != 0.0){
+        f_number *= power(base,precision);
+        string[length++] = '.';
+        data->flags.sign = false;
+        data->flags.space = false;
+        int_to_string(f_number,data,&length,base,string);
+    }else if(data->flags.hex_prefix){
+        string[length++] = '.';
+    }
+
+    if(width > length){
+        int cont = width-length;
+        if(data->flags.left_justified){
+            write_string_to_buffer(data,string,length);
+            while(cont != 0){
+                write_to_buffer(data,' ');
+            }
+        }else{
+            char pad = data->flags.zero_pad && data->flags.precision < 1? '0' : ' ';
+            while(cont != 0){
+                write_to_buffer(data,pad);
+            }
+            write_string_to_buffer(data,string,length);
+        }
+    }else{
+        write_string_to_buffer(data,string,length);
+    }
+}
+
     
 
 void handle_format(string_data *data){
@@ -309,21 +378,22 @@ void handle_format(string_data *data){
         case 'i':
         case 'd':
                 handle_int(data,(long int)va_arg(data->arguments,int),10);break;
-
         case 'u':
                 data->flags.unsign_number = true;
                 handle_int(data,(long int)va_arg(data->arguments,int),10);break;
-
         case 'o':data->flags.unsign_number = true;
                 handle_int(data,(long int)va_arg(data->arguments,int),8);break;
-
         case 'x':
         case 'X':data->flags.unsign_number = true;
                 handle_int(data,(long int)va_arg(data->arguments,int),16);break;
 
         case 'p':
             data->flags.unsign_number = true;
-            handle_int(data,(long int)va_arg(data->arguments,void *),16);break;
+            handle_int(data,(void *)va_arg(data->arguments,void *),16);break;
+
+        case 'f':
+        case 'F':
+            handle_real(data,(double)va_arg(data->arguments,double),10);break;
 
             
         default:
@@ -363,8 +433,9 @@ int main(){
 
     my_printf("%s\n","hola mundo");
 
-    my_printf("%X\n",-25);
-    printf("%X\n",-25);
+    my_printf("% .10X\n",-25);
+    
+    my_printf("%.2f",7.65);
     
 
     return 0;
