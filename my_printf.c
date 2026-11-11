@@ -7,7 +7,7 @@
 
 #define BUFFER_SIZE 2048
 
-//timotocuica
+//timotocuica x2
 
 //macro from linux implementation
 #define DIV_MOD(n,base) ({\
